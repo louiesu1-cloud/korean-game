@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>進階韓文單字小遊戲</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f8ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .game-container {
+            background-color: white;
+            padding: 30px 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 {
+            color: #4a90e2;
+            margin-bottom: 5px;
+            font-size: 1.8em;
+        }
+        .header-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.1em;
+            color: #666;
+            margin-bottom: 20px;
+            font-weight: bold;
+            padding-bottom: 10px;
+            border-bottom: 2px dashed #eee;
+        }
+        .timer {
+            color: #f44336;
+        }
+        .word-display {
+            font-size: 3em;
+            font-weight: bold;
+            color: #333;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 15px;
+            border: 2px solid #4a90e2;
+            cursor: pointer; /* 滑鼠移上去變手指 */
+            transition: all 0.2s;
+            position: relative;
+        }
+        .word-display:hover {
+            background-color: #e1f0ff;
+            transform: scale(1.02);
+        }
+        .word-hint {
+            font-size: 0.3em;
+            color: #888;
+            display: block;
+            margin-top: 5px;
+            font-weight: normal;
+        }
+        .options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 15px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 10px;
+            background-color: #eee;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #4a90e2;
+            color: white;
+            transform: scale(1.05);
+        }
+        button:disabled {
+            cursor: not-allowed;
+            transform: none;
+        }
+        .correct {
+            background-color: #4caf50 !important;
+            color: white !important;
+        }
+        .wrong {
+            background-color: #f44336 !important;
+            color: white !important;
+        }
+        #restart-btn {
+            display: none;
+            width: 100%;
+            background-color: #ff9800;
+            color: white;
+            margin-top: 20px;
+        }
+        #restart-btn:hover {
+            background-color: #e68a00;
+        }
+        .feedback {
+            height: 24px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>🇰🇷 韓文單字挑戰 2.0</h1>
+    <div class="header-info">
+        <div class="score-board">分數：<span id="score">0</span>/<span id="total">10</span></div>
+        <div class="timer">倒數：<span id="time-left">10</span>秒 ⏱️</div>
+    </div>
+    
+    <div class="feedback" id="feedback-text">準備好了嗎？</div>
+    <div class="word-display" id="korean-word" onclick="speakWord()">
+        準備中...
+        <span class="word-hint">🔊 點擊可以聽發音</span>
+    </div>
+    
+    <div class="options" id="options-container">
+        </div>
+
+    <button id="restart-btn" onclick="startGame()">再玩一次 🔄</button>
+</div>
+
+<script>
+    const vocabList = [
+        { ko: "안녕하세요", zh: "你好" },
+        { ko: "감사합니다", zh: "謝謝" },
+        { ko: "사과", zh: "蘋果" },
+        { ko: "고양이", zh: "貓" },
+        { ko: "물", zh: "水" },
+        { ko: "친구", zh: "朋友" },
+        { ko: "학교", zh: "學校" },
+        { ko: "가족", zh: "家人" },
+        { ko: "사랑해요", zh: "我愛你" },
+        { ko: "우유", zh: "牛奶" },
+        { ko: "강아지", zh: "小狗" },
+        { ko: "책상", zh: "書桌" },
+        { ko: "선생님", zh: "老師" },
+        { ko: "학생", zh: "學生" },
+        { ko: "의사", zh: "醫生" }
+    ];
+
+    let currentQuestion = {};
+    let score = 0;
+    let questionCount = 0;
+    const totalQuestions = 10;
+    
+    // 計時器相關變數
+    let timeLeft = 10;
+    let timerInterval;
+
+    const koreanWordEl = document.getElementById('korean-word');
+    const optionsContainer = document.getElementById('options-container');
+    const scoreEl = document.getElementById('score');
+    const totalEl = document.getElementById('total');
+    const restartBtn = document.getElementById('restart-btn');
+    const feedbackText = document.getElementById('feedback-text');
+    const timeLeftEl = document.getElementById('time-left');
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function startGame() {
+        score = 0;
+        questionCount = 0;
+        scoreEl.innerText = score;
+        totalEl.innerText = totalQuestions;
+        restartBtn.style.display = 'none';
+        nextQuestion();
+    }
+
+    function startTimer() {
+        timeLeft = 10;
+        timeLeftEl.innerText = timeLeft;
+        clearInterval(timerInterval);
+        
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timeLeftEl.innerText = timeLeft;
+            
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                handleTimeout(); // 時間到
+            }
+        }, 1000);
+    }
+
+    // 發音功能 (Web Speech API)
+    function speakWord() {
+        if (!currentQuestion.ko) return;
+        const utterance = new SpeechSynthesisUtterance(currentQuestion.ko);
+        utterance.lang = 'ko-KR'; // 設定語言為韓文
+        utterance.rate = 0.8; // 語速稍微放慢方便學習
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function nextQuestion() {
+        if (questionCount >= totalQuestions) {
+            endGame();
+            return;
+        }
+
+        feedbackText.innerText = `第 ${questionCount + 1} 題`;
+        feedbackText.style.color = "#666";
+        
+        // 隨機選一個正確答案
+        currentQuestion = vocabList[Math.floor(Math.random() * vocabList.length)];
+        
+        // 顯示韓文 (保留提示文字)
+        koreanWordEl.innerHTML = `${currentQuestion.ko}<span class="word-hint">🔊 點擊可以聽發音</span>`;
+
+        // 產生選項 (1個正確，3個錯誤)
+        let wrongOptions = vocabList.filter(word => word.zh !== currentQuestion.zh);
+        wrongOptions = shuffleArray(wrongOptions).slice(0, 3);
+        
+        let options = [currentQuestion, ...wrongOptions];
+        options = shuffleArray(options);
+
+        // 渲染按鈕
+        optionsContainer.innerHTML = '';
+        options.forEach(option => {
+            const btn = document.createElement('button');
+            btn.innerText = option.zh;
+            btn.onclick = () => checkAnswer(btn, option.zh);
+            optionsContainer.appendChild(btn);
+        });
+
+        questionCount++;
+        
+        // 自動發音一次
+        speakWord();
+        
+        // 開始倒數
+        startTimer();
+    }
+
+    function checkAnswer(selectedBtn, selectedZh) {
+        clearInterval(timerInterval); // 停止計時
+        const buttons = optionsContainer.querySelectorAll('button');
+        buttons.forEach(btn => btn.disabled = true);
+
+        if (selectedZh === currentQuestion.zh) {
+            selectedBtn.classList.add('correct');
+            feedbackText.innerText = "⭕ 答對了！";
+            feedbackText.style.color = "#4caf50";
+            score++;
+            scoreEl.innerText = score;
+        } else {
+            selectedBtn.classList.add('wrong');
+            showCorrectAnswer(buttons);
+        }
+
+        setTimeout(nextQuestion, 1500);
+    }
+
+    function handleTimeout() {
+        const buttons = optionsContainer.querySelectorAll('button');
+        buttons.forEach(btn => btn.disabled = true);
+        
+        feedbackText.innerText = `⏰ 時間到！正確答案是「${currentQuestion.zh}」`;
+        feedbackText.style.color = "#f44336";
+        
+        showCorrectAnswer(buttons);
+        setTimeout(nextQuestion, 2000); // 時間到多停半秒讓玩家看答案
+    }
+
+    function showCorrectAnswer(buttons) {
+        feedbackText.innerText = `❌ 答錯了/超時！答案是「${currentQuestion.zh}」`;
+        feedbackText.style.color = "#f44336";
+        buttons.forEach(btn => {
+            if (btn.innerText === currentQuestion.zh) {
+                btn.classList.add('correct');
+            }
+        });
+    }
+
+    function endGame() {
+        clearInterval(timerInterval);
+        koreanWordEl.innerHTML = "🎉 遊戲結束！";
+        optionsContainer.innerHTML = '';
+        timeLeftEl.innerText = "0";
+        feedbackText.innerText = `你的最終得分是 ${score} / ${totalQuestions}`;
+        feedbackText.style.color = "#4a90e2";
+        restartBtn.style.display = 'block';
+    }
+
+    // 網頁載入時自動開始遊戲
+    window.onload = startGame;
+</script>
+
+</body>
+</html>
